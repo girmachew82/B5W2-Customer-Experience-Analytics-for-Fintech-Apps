@@ -1,5 +1,6 @@
 from google_play_scraper import app,Sort, reviews_all
-    
+import csv
+import os    
 
 
 class DataCollectionPreProcesse:
@@ -20,9 +21,6 @@ class DataCollectionPreProcesse:
             ValueError: If ID is empty, or lang/country codes are invalid.
             TypeError: If any of the inputs are not strings.
         """
-        print(id)
-        print(lang)
-        print(country)
         # Validate `id`
         if not isinstance(id, str):
             raise TypeError("ID must be a string.")
@@ -48,7 +46,7 @@ class DataCollectionPreProcesse:
     def reviews(self, id: str,
                 sleep_milliseconds: int = 0,
                 lang: str = 'en',
-                country: str = "us",
+                country: str = "et",
                 sort = Sort.MOST_RELEVANT,
                 filter_score_with: int = None):
         """
@@ -73,5 +71,72 @@ class DataCollectionPreProcesse:
             sort=sort,
             filter_score_with=filter_score_with
         )
+    
+
+    def export_reviews_to_csv(reviews, csv_filename,folder='data'):
+        """
+        Export a list of reviews to a CSV file. Appends if the file already exists.
+
+        Args:
+            reviews (list): List of review dictionaries (from Google Play).
+            csv_filename (str): Path to the CSV file to write or append to.
+        """
+        # Ensure the folder exists
+        os.makedirs(folder, exist_ok=True)
+        # Full path to the CSV file
+        filepath = os.path.join(folder, csv_filename)        
+        # Define the fieldnames you want to export
+        fieldnames = ['app_id', 'userName', 'score', 'content', 'at']
+
+        # Check if file exists to decide header writing
+        file_exists = os.path.isfile(filepath)
+
+        with open(filepath, mode='a', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+
+            # Write header only once (if file does not exist)
+            if not file_exists:
+                writer.writeheader()
+
+            for review in reviews:
+                writer.writerow({
+                    'app_id': review.get('appId'),
+                    'userName': review.get('userName'),
+                    'score': review.get('score'),
+                    'content': review.get('content'),
+                    'at': review.get('at')
+                })
+
+        print(f"✅ {len(reviews)} reviews exported to {csv_filename}")
 
 
+    def export_all_reviews_to_single_csv(self, reviews_list, csv_filename="all_bank_reviews.csv", folder='data'):
+            """
+            Export reviews from multiple apps to a single CSV file.
+
+            Args:
+                reviews_list (list): List of tuples like (app_id, reviews).
+                csv_filename (str): Name of the CSV file.
+                folder (str): Folder to save the CSV file in.
+            """
+            os.makedirs(folder, exist_ok=True)
+            filepath = os.path.join(folder, csv_filename)
+
+            fieldnames = ['app_id', 'userName', 'score', 'content', 'at']
+
+            file_exists = os.path.isfile(filepath)
+            with open(filepath, mode='a', newline='', encoding='utf-8') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                if not file_exists:
+                    writer.writeheader()
+
+                for app_id, reviews in reviews_list:
+                    for r in reviews:
+                        writer.writerow({
+                            'app_id': app_id,
+                            'userName': r.get('userName'),
+                            'score': r.get('score'),
+                            'content': r.get('content'),
+                            'at': r.get('at')
+                        })
+            print(f"✅ Exported to {filepath}")
