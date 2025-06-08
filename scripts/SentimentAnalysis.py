@@ -9,6 +9,7 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 from textblob import TextBlob
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 import emoji
 
@@ -223,3 +224,51 @@ class SentimentAnalysis:
             .unstack(fill_value=0)
             .reset_index()
         )
+    def extract_keywords_tfidf_by_app(
+        self,
+        df: pd.DataFrame,
+        text_col='cleaned_review',
+        top_n=20,
+        ngram_range=(1, 2)
+    ) -> pd.DataFrame:
+        """
+        Extract significant keywords or n-grams using TF-IDF per app_id.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing cleaned text and app_id.
+            text_col (str): Column name of the cleaned review text.
+            top_n (int): Number of top keywords or n-grams to return per app_id.
+            ngram_range (tuple): Range of n-grams (e.g., (1,2) for unigrams and bigrams).
+
+        Returns:
+            pd.DataFrame: DataFrame with columns ['app_id', 'term', 'score'] showing top keywords per app.
+        """
+        if text_col not in df.columns or 'app_id' not in df.columns:
+            raise ValueError("DataFrame must contain 'app_id' and the specified text column.")
+
+        result_frames = []
+
+        for app_id, group in df.groupby('app_id'):
+            texts = group[text_col].dropna().tolist()
+
+            if not texts:
+                continue  # Skip empty app_ids
+
+            vectorizer = TfidfVectorizer(ngram_range=ngram_range, stop_words='english', max_features=10000)
+            tfidf_matrix = vectorizer.fit_transform(texts)
+
+            tfidf_scores = tfidf_matrix.sum(axis=0).A1
+            terms = vectorizer.get_feature_names_out()
+
+            scores_df = pd.DataFrame({
+                'app_id': app_id,
+                'term': terms,
+                'score': tfidf_scores
+            })
+
+            top_terms = scores_df.sort_values(by='score', ascending=False).head(top_n)
+            result_frames.append(top_terms)
+
+        # Combine all app-specific results into one DataFrame
+        final_df = pd.concat(result_frames, ignore_index=True)
+        return final_df
