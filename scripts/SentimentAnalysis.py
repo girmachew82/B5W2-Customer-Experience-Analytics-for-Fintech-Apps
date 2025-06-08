@@ -10,6 +10,8 @@ from textblob import TextBlob
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
 from sklearn.feature_extraction.text import TfidfVectorizer
+from collections import defaultdict
+import re
 
 import emoji
 
@@ -272,3 +274,27 @@ class SentimentAnalysis:
         # Combine all app-specific results into one DataFrame
         final_df = pd.concat(result_frames, ignore_index=True)
         return final_df
+    def group_keywords_by_theme(self,keywords_df, themes):
+        grouped_by_app = {}
+
+        for app_id in keywords_df['app_id'].unique():
+            subset = keywords_df[keywords_df['app_id'] == app_id]
+            grouped = defaultdict(list)
+
+            for _, row in subset.iterrows():
+                keyword = row['term'].lower()
+                score = row['score']
+                assigned = False
+
+                for theme, terms in themes.items():
+                    if any(re.search(rf"\b{re.escape(term)}\b", keyword) for term in terms):
+                        grouped[theme].append((keyword, score))
+                        assigned = True
+                        break
+
+                if not assigned:
+                    grouped["Other"].append((keyword, score))
+
+            grouped_by_app[app_id] = grouped
+
+        return grouped_by_app
